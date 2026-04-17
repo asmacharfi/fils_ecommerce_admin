@@ -59,6 +59,7 @@ model Product {
   name        String
   price       Decimal
   isFeatured  Boolean   @default(false)
+  isBillboard Boolean   @default(false)
   isArchived  Boolean   @default(false)
   sizeId      String    // Foreign Key to Size
   size        Size      @relation(fields: [sizeId], references: [id])

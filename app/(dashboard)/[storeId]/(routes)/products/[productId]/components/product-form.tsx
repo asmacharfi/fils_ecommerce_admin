@@ -36,13 +36,15 @@ const formSchema = z.object({
   colorId: z.string().min(1),
   sizeId: z.string().min(1),
   isFeatured: z.boolean().default(false).optional(),
+  isBillboard: z.boolean().default(false).optional(),
   isArchived: z.boolean().default(false).optional()
 });
 
 type ProductFormValues = z.infer<typeof formSchema>
 
 interface ProductFormProps {
-  initialData: Product & {
+  initialData: Omit<Product, "price"> & {
+    price: string | number;
     images: Image[]
   } | null;
   categories: Category[];
@@ -78,6 +80,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     colorId: '',
     sizeId: '',
     isFeatured: false,
+    isBillboard: false,
     isArchived: false,
   }
 
@@ -295,6 +298,29 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     </FormLabel>
                     <FormDescription>
                       This product will not appear anywhere in the store.
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="isBillboard"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      // @ts-ignore
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      Billboard Carousel
+                    </FormLabel>
+                    <FormDescription>
+                      This product will be shown in the home page hero carousel.
                     </FormDescription>
                   </div>
                 </FormItem>

@@ -41,7 +41,14 @@ const ProductPage = async ({
           categories={categories} 
           colors={colors}
           sizes={sizes}
-          initialData={product}
+          initialData={
+            product
+              ? {
+                  ...product,
+                  price: product.price.toString(),
+                }
+              : null
+          }
         />
       </div>
     </div>
