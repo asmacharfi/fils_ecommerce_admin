@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs';
 
 import Navbar from '@/components/navbar'
+import AdminAIDrawer from '@/components/admin-ai-drawer'
 import prismadb from '@/lib/prismadb';
 
 export default async function DashboardLayout({
@@ -31,6 +32,7 @@ export default async function DashboardLayout({
   return (
     <>
       <Navbar />
+      <AdminAIDrawer storeId={params.storeId} />
       {children}
     </>
   );
