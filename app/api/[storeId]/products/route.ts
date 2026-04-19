@@ -12,7 +12,22 @@ export async function POST(
 
     const body = await req.json();
 
-    const { name, price, categoryId, colorId, sizeId, images, isFeatured, isBillboard, isArchived } = body;
+    const {
+      name,
+      price,
+      categoryId,
+      colorId,
+      sizeId,
+      images,
+      isFeatured,
+      isBillboard,
+      isArchived,
+      description,
+      stock,
+      width,
+      height,
+      depth,
+    } = body;
 
     if (!userId) {
       return new NextResponse("Unauthenticated", { status: 403 });
@@ -42,6 +57,11 @@ export async function POST(
       return new NextResponse("Size id is required", { status: 400 });
     }
 
+    const stockNum = stock === undefined || stock === null ? 0 : Number(stock);
+    if (!Number.isInteger(stockNum) || stockNum < 0) {
+      return new NextResponse("Stock must be a non-negative integer", { status: 400 });
+    }
+
     if (!params.storeId) {
       return new NextResponse("Store id is required", { status: 400 });
     }
@@ -60,6 +80,11 @@ export async function POST(
     const product = await prismadb.product.create({
       data: {
         name,
+        description: typeof description === "string" ? description : "",
+        stock: stockNum,
+        width: width != null && width !== "" ? Number(width) : null,
+        height: height != null && height !== "" ? Number(height) : null,
+        depth: depth != null && depth !== "" ? Number(depth) : null,
         price,
         isFeatured: isFeatured ?? false,
         isBillboard: isBillboard ?? false,

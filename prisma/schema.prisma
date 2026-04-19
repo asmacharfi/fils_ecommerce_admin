@@ -57,7 +57,12 @@ model Product {
   categoryId  String    // Foreign Key to Category
   category    Category  @relation("CategoryToProduct", fields: [categoryId], references: [id])
   name        String
+  description String    @default("") @db.Text
   price       Decimal
+  stock       Int       @default(0)
+  width       Float?
+  height      Float?
+  depth       Float?
   isFeatured  Boolean   @default(false)
   isBillboard Boolean   @default(false)
   isArchived  Boolean   @default(false)
@@ -97,6 +102,7 @@ model OrderItem {
   order     Order   @relation(fields: [orderId], references: [id])
   productId String  // Foreign Key to Product
   product   Product @relation(fields: [productId], references: [id])
+  quantity  Int     @default(1)
 
   @@index([orderId])
   @@index([productId])

@@ -80,7 +80,22 @@ export async function PATCH(
 
     const body = await req.json();
 
-    const { name, price, categoryId, images, colorId, sizeId, isFeatured, isBillboard, isArchived } = body;
+    const {
+      name,
+      price,
+      categoryId,
+      images,
+      colorId,
+      sizeId,
+      isFeatured,
+      isBillboard,
+      isArchived,
+      description,
+      stock,
+      width,
+      height,
+      depth,
+    } = body;
 
     if (!userId) {
       return new NextResponse("Unauthenticated", { status: 403 });
@@ -114,6 +129,11 @@ export async function PATCH(
       return new NextResponse("Size id is required", { status: 400 });
     }
 
+    const stockNum = Number(stock);
+    if (!Number.isInteger(stockNum) || stockNum < 0) {
+      return new NextResponse("Stock must be a non-negative integer", { status: 400 });
+    }
+
     const storeByUserId = await prismadb.store.findFirst({
       where: {
         id: params.storeId,
@@ -131,6 +151,11 @@ export async function PATCH(
       },
       data: {
         name,
+        description: typeof description === "string" ? description : "",
+        stock: stockNum,
+        width: width != null && width !== "" ? Number(width) : null,
+        height: height != null && height !== "" ? Number(height) : null,
+        depth: depth != null && depth !== "" ? Number(depth) : null,
         price,
         categoryId,
         colorId,

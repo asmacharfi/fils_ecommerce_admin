@@ -11,6 +11,7 @@ import { Category, Color, Image, Product, Size } from "@prisma/client"
 import { useParams, useRouter } from "next/navigation"
 
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -35,9 +36,14 @@ const formSchema = z.object({
   categoryId: z.string().min(1),
   colorId: z.string().min(1),
   sizeId: z.string().min(1),
+  description: z.string().optional().default(""),
+  stock: z.coerce.number().int().min(0),
+  width: z.string().optional().default(""),
+  height: z.string().optional().default(""),
+  depth: z.string().optional().default(""),
   isFeatured: z.boolean().default(false).optional(),
   isBillboard: z.boolean().default(false).optional(),
-  isArchived: z.boolean().default(false).optional()
+  isArchived: z.boolean().default(false).optional(),
 });
 
 type ProductFormValues = z.infer<typeof formSchema>
@@ -69,20 +75,41 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const toastMessage = initialData ? 'Product updated.' : 'Product created.';
   const action = initialData ? 'Save changes' : 'Create';
 
-  const defaultValues = initialData ? {
-    ...initialData,
-    price: parseFloat(String(initialData?.price)),
-  } : {
-    name: '',
-    images: [],
-    price: 0,
-    categoryId: '',
-    colorId: '',
-    sizeId: '',
-    isFeatured: false,
-    isBillboard: false,
-    isArchived: false,
-  }
+  const defaultValues = initialData
+    ? {
+        ...initialData,
+        price: parseFloat(String(initialData?.price)),
+        description: initialData.description ?? "",
+        stock: initialData.stock ?? 0,
+        width:
+          initialData.width != null && !Number.isNaN(Number(initialData.width))
+            ? String(initialData.width)
+            : "",
+        height:
+          initialData.height != null && !Number.isNaN(Number(initialData.height))
+            ? String(initialData.height)
+            : "",
+        depth:
+          initialData.depth != null && !Number.isNaN(Number(initialData.depth))
+            ? String(initialData.depth)
+            : "",
+      }
+    : {
+        name: "",
+        images: [],
+        price: 0,
+        categoryId: "",
+        colorId: "",
+        sizeId: "",
+        description: "",
+        stock: 0,
+        width: "",
+        height: "",
+        depth: "",
+        isFeatured: false,
+        isBillboard: false,
+        isArchived: false,
+      };
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(formSchema),
@@ -92,10 +119,22 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const onSubmit = async (data: ProductFormValues) => {
     try {
       setLoading(true);
+      const parseDim = (s: string) => {
+        const t = s?.trim() ?? "";
+        if (!t) return null;
+        const n = parseFloat(t);
+        return Number.isFinite(n) ? n : null;
+      };
+      const payload = {
+        ...data,
+        width: parseDim(data.width),
+        height: parseDim(data.height),
+        depth: parseDim(data.depth),
+      };
       if (initialData) {
-        await axios.patch(`/api/${params.storeId}/products/${params.productId}`, data);
+        await axios.patch(`/api/${params.storeId}/products/${params.productId}`, payload);
       } else {
-        await axios.post(`/api/${params.storeId}/products`, data);
+        await axios.post(`/api/${params.storeId}/products`, payload);
       }
       router.refresh();
       router.push(`/${params.storeId}/products`);
@@ -164,6 +203,19 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               </FormItem>
             )}
           />
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Description</FormLabel>
+                <FormControl>
+                  <Textarea disabled={loading} placeholder="Product description" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
           <div className="md:grid md:grid-cols-3 gap-8">
             <FormField
               control={form.control}
@@ -186,6 +238,59 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   <FormLabel>Price</FormLabel>
                   <FormControl>
                     <Input type="number" disabled={loading} placeholder="9.99" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="stock"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Stock</FormLabel>
+                  <FormControl>
+                    <Input type="number" min={0} step={1} disabled={loading} placeholder="0" {...field} />
+                  </FormControl>
+                  <FormDescription>Available units for sale.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="width"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Width</FormLabel>
+                  <FormControl>
+                    <Input type="text" disabled={loading} placeholder="e.g. 12" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="height"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Height</FormLabel>
+                  <FormControl>
+                    <Input type="text" disabled={loading} placeholder="e.g. 8" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="depth"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Depth</FormLabel>
+                  <FormControl>
+                    <Input type="text" disabled={loading} placeholder="e.g. 4" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
