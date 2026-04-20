@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs";
 
-import prismadb, { disconnectPrismadb } from "@/lib/prismadb";
+import prismadb from "@/lib/prismadb";
 import { publicError, publicJson } from "@/lib/public-cors";
 
 type ImageInput = { url: string; colorId?: string | null };
@@ -249,7 +249,5 @@ export async function GET(req: Request, { params }: { params: { storeId: string 
   } catch (error) {
     console.log("[PRODUCTS_GET]", error);
     return publicError("Internal error", 500);
-  } finally {
-    await disconnectPrismadb();
   }
 }

@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import { NextResponse } from "next/server";
 
 import { stripe } from "@/lib/stripe";
-import prismadb, { disconnectPrismadb } from "@/lib/prismadb";
+import prismadb from "@/lib/prismadb";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -259,7 +259,5 @@ export async function POST(req: Request, { params }: { params: { storeId: string
     }
     console.log("[CHECKOUT_POST]", e);
     return new NextResponse("Internal error", { status: 500, headers: corsHeaders });
-  } finally {
-    await disconnectPrismadb();
   }
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs';
 
-import prismadb, { disconnectPrismadb } from '@/lib/prismadb';
+import prismadb from '@/lib/prismadb';
 import { publicError, publicJson } from '@/lib/public-cors';
  
 export async function POST(
@@ -76,7 +76,5 @@ export async function GET(
   } catch (error) {
     console.log('[CATEGORIES_GET]', error);
     return publicError("Internal error", 500);
-  } finally {
-    await disconnectPrismadb();
   }
 };
