@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs";
 
 import prismadb from "@/lib/prismadb";
+import { publicError, publicJson } from "@/lib/public-cors";
 import {
   InsufficientVariantStagingError,
   reconcileProductVariants,
@@ -69,7 +70,7 @@ const productInclude = {
 export async function GET(req: Request, { params }: { params: { productId: string } }) {
   try {
     if (!params.productId) {
-      return new NextResponse("Product id is required", { status: 400 });
+      return publicError("Product id is required", 400);
     }
 
     const product = await prismadb.product.findUnique({
@@ -79,10 +80,10 @@ export async function GET(req: Request, { params }: { params: { productId: strin
       include: productInclude,
     });
 
-    return NextResponse.json(product);
+    return publicJson(product);
   } catch (error) {
     console.log("[PRODUCT_GET]", error);
-    return new NextResponse("Internal error", { status: 500 });
+    return publicError("Internal error", 500);
   }
 }
 

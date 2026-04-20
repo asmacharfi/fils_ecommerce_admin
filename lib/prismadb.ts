@@ -11,9 +11,7 @@ function prismaDatabaseUrl(): string | undefined {
   try {
     const u = new URL(raw);
     if (!u.searchParams.has("connection_limit")) {
-      const limit =
-        process.env.DATABASE_CONNECTION_LIMIT ??
-        (process.env.NODE_ENV === "development" ? "1" : "3");
+      const limit = process.env.DATABASE_CONNECTION_LIMIT ?? "1";
       u.searchParams.set("connection_limit", limit);
     }
     if (!u.searchParams.has("pool_timeout")) {

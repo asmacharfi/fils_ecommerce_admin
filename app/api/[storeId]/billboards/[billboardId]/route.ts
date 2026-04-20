@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs";
 
 import prismadb from "@/lib/prismadb";
+import { publicError, publicJson } from "@/lib/public-cors";
 
 export async function GET(
   req: Request,
@@ -9,7 +10,7 @@ export async function GET(
 ) {
   try {
     if (!params.billboardId) {
-      return new NextResponse("Billboard id is required", { status: 400 });
+      return publicError("Billboard id is required", 400);
     }
 
     const billboard = await prismadb.billboard.findUnique({
@@ -18,10 +19,10 @@ export async function GET(
       }
     });
   
-    return NextResponse.json(billboard);
+    return publicJson(billboard);
   } catch (error) {
     console.log('[BILLBOARD_GET]', error);
-    return new NextResponse("Internal error", { status: 500 });
+    return publicError("Internal error", 500);
   }
 };
 

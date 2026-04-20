@@ -56,7 +56,10 @@ export async function POST(req: Request, { params }: { params: { storeId: string
   const lines = parseCheckoutLines(rawItems);
 
   if (!lines?.length) {
-    return new NextResponse("items array with variantId or productId and quantity is required", { status: 400 });
+    return new NextResponse("items array with variantId or productId and quantity is required", {
+      status: 400,
+      headers: corsHeaders,
+    });
   }
 
   const variantLines = lines.filter((l): l is VariantLine => l.kind === "variant");
@@ -79,7 +82,10 @@ export async function POST(req: Request, { params }: { params: { storeId: string
   });
 
   if (variantIds.length && variants.length !== new Set(variantIds).size) {
-    return new NextResponse("Invalid or missing variants for this store", { status: 400 });
+    return new NextResponse("Invalid or missing variants for this store", {
+      status: 400,
+      headers: corsHeaders,
+    });
   }
 
   const byVariantId = new Map(variants.map((v) => [v.id, v]));
@@ -87,7 +93,10 @@ export async function POST(req: Request, { params }: { params: { storeId: string
   for (const line of variantLines) {
     const v = byVariantId.get(line.variantId);
     if (!v || line.quantity > v.stock) {
-      return new NextResponse("Insufficient stock for one or more items", { status: 400 });
+      return new NextResponse("Insufficient stock for one or more items", {
+        status: 400,
+        headers: corsHeaders,
+      });
     }
   }
 
@@ -111,7 +120,10 @@ export async function POST(req: Request, { params }: { params: { storeId: string
       : [];
 
   if (productIds.length && simpleProducts.length !== new Set(productIds).size) {
-    return new NextResponse("Invalid or missing products for this store", { status: 400 });
+    return new NextResponse("Invalid or missing products for this store", {
+      status: 400,
+      headers: corsHeaders,
+    });
   }
 
   const byProductId = new Map(simpleProducts.map((p) => [p.id, p]));
@@ -119,7 +131,10 @@ export async function POST(req: Request, { params }: { params: { storeId: string
   for (const line of productLines) {
     const p = byProductId.get(line.productId);
     if (!p || line.quantity > p.stock) {
-      return new NextResponse("Insufficient stock for one or more items", { status: 400 });
+      return new NextResponse("Insufficient stock for one or more items", {
+        status: 400,
+        headers: corsHeaders,
+      });
     }
   }
 
@@ -239,9 +254,10 @@ export async function POST(req: Request, { params }: { params: { storeId: string
     if (e instanceof Error && e.message === "STOCK_CONFLICT") {
       return new NextResponse("Stock changed while checking out. Please refresh and try again.", {
         status: 409,
+        headers: corsHeaders,
       });
     }
     console.log("[CHECKOUT_POST]", e);
-    return new NextResponse("Internal error", { status: 500 });
+    return new NextResponse("Internal error", { status: 500, headers: corsHeaders });
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs";
 
 import prismadb from "@/lib/prismadb";
+import { publicError, publicJson } from "@/lib/public-cors";
 
 type ImageInput = { url: string; colorId?: string | null };
 type VariantInput = { id?: string; colorId: string; sizeId: string; stock: number };
@@ -208,7 +209,7 @@ export async function GET(req: Request, { params }: { params: { storeId: string 
     const isBillboard = searchParams.get("isBillboard");
 
     if (!params.storeId) {
-      return new NextResponse("Store id is required", { status: 400 });
+      return publicError("Store id is required", 400);
     }
 
     const products = await prismadb.product.findMany({
@@ -244,9 +245,9 @@ export async function GET(req: Request, { params }: { params: { storeId: string 
       },
     });
 
-    return NextResponse.json(products);
+    return publicJson(products);
   } catch (error) {
     console.log("[PRODUCTS_GET]", error);
-    return new NextResponse("Internal error", { status: 500 });
+    return publicError("Internal error", 500);
   }
 }

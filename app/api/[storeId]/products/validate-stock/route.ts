@@ -153,6 +153,6 @@ export async function POST(req: Request, { params }: { params: { storeId: string
     return NextResponse.json({ ok: true }, { headers: corsHeaders });
   } catch (error) {
     console.log("[VALIDATE_STOCK_POST]", error);
-    return new NextResponse("Internal error", { status: 500 });
+    return new NextResponse("Internal error", { status: 500, headers: corsHeaders });
   }
 }

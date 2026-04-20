@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs";
 
 import prismadb from "@/lib/prismadb";
+import { publicError, publicJson } from "@/lib/public-cors";
 
 export async function GET(
   req: Request,
@@ -9,7 +10,7 @@ export async function GET(
 ) {
   try {
     if (!params.categoryId) {
-      return new NextResponse("Category id is required", { status: 400 });
+      return publicError("Category id is required", 400);
     }
 
     const category = await prismadb.category.findUnique({
@@ -21,10 +22,10 @@ export async function GET(
       }
     });
   
-    return NextResponse.json(category);
+    return publicJson(category);
   } catch (error) {
     console.log('[CATEGORY_GET]', error);
-    return new NextResponse("Internal error", { status: 500 });
+    return publicError("Internal error", 500);
   }
 };
 

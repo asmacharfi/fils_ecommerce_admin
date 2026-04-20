@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import prismadb from '@/lib/prismadb';
 import { auth } from '@clerk/nextjs';
+import { publicError, publicJson } from '@/lib/public-cors';
  
 export async function POST(
   req: Request,
@@ -62,7 +63,7 @@ export async function GET(
 ) {
   try {
     if (!params.storeId) {
-      return new NextResponse("Store id is required", { status: 400 });
+      return publicError("Store id is required", 400);
     }
 
     const colors = await prismadb.color.findMany({
@@ -71,9 +72,9 @@ export async function GET(
       }
     });
   
-    return NextResponse.json(colors);
+    return publicJson(colors);
   } catch (error) {
     console.log('[COLORS_GET]', error);
-    return new NextResponse("Internal error", { status: 500 });
+    return publicError("Internal error", 500);
   }
 };
