@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs";
 
-import prismadb from "@/lib/prismadb";
+import prismadb, { disconnectPrismadb } from "@/lib/prismadb";
 import { publicError, publicJson } from "@/lib/public-cors";
 import {
   InsufficientVariantStagingError,
@@ -84,6 +84,8 @@ export async function GET(req: Request, { params }: { params: { productId: strin
   } catch (error) {
     console.log("[PRODUCT_GET]", error);
     return publicError("Internal error", 500);
+  } finally {
+    await disconnectPrismadb();
   }
 }
 

@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import { NextResponse } from "next/server";
 
 import { stripe } from "@/lib/stripe";
-import prismadb from "@/lib/prismadb";
+import prismadb, { disconnectPrismadb } from "@/lib/prismadb";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,94 +51,94 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: Request, { params }: { params: { storeId: string } }) {
-  const body = await req.json();
-  const rawItems = body.items as unknown;
-  const lines = parseCheckoutLines(rawItems);
-
-  if (!lines?.length) {
-    return new NextResponse("items array with variantId or productId and quantity is required", {
-      status: 400,
-      headers: corsHeaders,
-    });
-  }
-
-  const variantLines = lines.filter((l): l is VariantLine => l.kind === "variant");
-  const productLines = lines.filter((l): l is ProductLine => l.kind === "product");
-
-  const variantIds = variantLines.map((l) => l.variantId);
-  const variants = await prismadb.productVariant.findMany({
-    where: {
-      id: { in: variantIds },
-      product: {
-        storeId: params.storeId,
-        isArchived: false,
-      },
-    },
-    include: {
-      product: true,
-      color: true,
-      size: true,
-    },
-  });
-
-  if (variantIds.length && variants.length !== new Set(variantIds).size) {
-    return new NextResponse("Invalid or missing variants for this store", {
-      status: 400,
-      headers: corsHeaders,
-    });
-  }
-
-  const byVariantId = new Map(variants.map((v) => [v.id, v]));
-
-  for (const line of variantLines) {
-    const v = byVariantId.get(line.variantId);
-    if (!v || line.quantity > v.stock) {
-      return new NextResponse("Insufficient stock for one or more items", {
-        status: 400,
-        headers: corsHeaders,
-      });
-    }
-  }
-
-  const productIds = productLines.map((l) => l.productId);
-  const simpleProducts =
-    productIds.length > 0
-      ? await prismadb.product.findMany({
-          where: {
-            id: { in: productIds },
-            storeId: params.storeId,
-            isArchived: false,
-            variants: { none: {} },
-          },
-          select: {
-            id: true,
-            stock: true,
-            name: true,
-            price: true,
-          },
-        })
-      : [];
-
-  if (productIds.length && simpleProducts.length !== new Set(productIds).size) {
-    return new NextResponse("Invalid or missing products for this store", {
-      status: 400,
-      headers: corsHeaders,
-    });
-  }
-
-  const byProductId = new Map(simpleProducts.map((p) => [p.id, p]));
-
-  for (const line of productLines) {
-    const p = byProductId.get(line.productId);
-    if (!p || line.quantity > p.stock) {
-      return new NextResponse("Insufficient stock for one or more items", {
-        status: 400,
-        headers: corsHeaders,
-      });
-    }
-  }
-
   try {
+    const body = await req.json();
+    const rawItems = body.items as unknown;
+    const lines = parseCheckoutLines(rawItems);
+
+    if (!lines?.length) {
+      return new NextResponse("items array with variantId or productId and quantity is required", {
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+
+    const variantLines = lines.filter((l): l is VariantLine => l.kind === "variant");
+    const productLines = lines.filter((l): l is ProductLine => l.kind === "product");
+
+    const variantIds = variantLines.map((l) => l.variantId);
+    const variants = await prismadb.productVariant.findMany({
+      where: {
+        id: { in: variantIds },
+        product: {
+          storeId: params.storeId,
+          isArchived: false,
+        },
+      },
+      include: {
+        product: true,
+        color: true,
+        size: true,
+      },
+    });
+
+    if (variantIds.length && variants.length !== new Set(variantIds).size) {
+      return new NextResponse("Invalid or missing variants for this store", {
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+
+    const byVariantId = new Map(variants.map((v) => [v.id, v]));
+
+    for (const line of variantLines) {
+      const v = byVariantId.get(line.variantId);
+      if (!v || line.quantity > v.stock) {
+        return new NextResponse("Insufficient stock for one or more items", {
+          status: 400,
+          headers: corsHeaders,
+        });
+      }
+    }
+
+    const productIds = productLines.map((l) => l.productId);
+    const simpleProducts =
+      productIds.length > 0
+        ? await prismadb.product.findMany({
+            where: {
+              id: { in: productIds },
+              storeId: params.storeId,
+              isArchived: false,
+              variants: { none: {} },
+            },
+            select: {
+              id: true,
+              stock: true,
+              name: true,
+              price: true,
+            },
+          })
+        : [];
+
+    if (productIds.length && simpleProducts.length !== new Set(productIds).size) {
+      return new NextResponse("Invalid or missing products for this store", {
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+
+    const byProductId = new Map(simpleProducts.map((p) => [p.id, p]));
+
+    for (const line of productLines) {
+      const p = byProductId.get(line.productId);
+      if (!p || line.quantity > p.stock) {
+        return new NextResponse("Insufficient stock for one or more items", {
+          status: 400,
+          headers: corsHeaders,
+        });
+      }
+    }
+
     const orderId = await prismadb.$transaction(async (tx) => {
       for (const line of variantLines) {
         const result = await tx.productVariant.updateMany({
@@ -259,5 +259,7 @@ export async function POST(req: Request, { params }: { params: { storeId: string
     }
     console.log("[CHECKOUT_POST]", e);
     return new NextResponse("Internal error", { status: 500, headers: corsHeaders });
+  } finally {
+    await disconnectPrismadb();
   }
 }

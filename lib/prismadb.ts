@@ -45,4 +45,12 @@ const prismadb =
   globalForPrisma.prismadb ??
   (globalForPrisma.prismadb = createClient());
 
+export async function disconnectPrismadb() {
+  try {
+    await prismadb.$disconnect();
+  } catch {
+    // Ignore disconnect failures between short-lived serverless invocations.
+  }
+}
+
 export default prismadb;

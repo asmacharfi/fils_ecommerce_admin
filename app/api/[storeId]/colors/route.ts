@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import prismadb from '@/lib/prismadb';
+import prismadb, { disconnectPrismadb } from '@/lib/prismadb';
 import { auth } from '@clerk/nextjs';
 import { publicError, publicJson } from '@/lib/public-cors';
  
@@ -76,5 +76,7 @@ export async function GET(
   } catch (error) {
     console.log('[COLORS_GET]', error);
     return publicError("Internal error", 500);
+  } finally {
+    await disconnectPrismadb();
   }
 };
