@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs";
 
 import prismadb from "@/lib/prismadb";
+import {
+  InsufficientVariantStagingError,
+  reconcileProductVariants,
+} from "@/lib/reconcile-product-variants";
 
 type ImageInput = { url: string; colorId?: string | null };
 type VariantInput = { id?: string; colorId: string; sizeId: string; stock: number };
@@ -232,44 +236,9 @@ export async function PATCH(
         return new NextResponse("At least one valid variant (colorId, sizeId, stock) is required", { status: 400 });
       }
 
-      const incomingVariantIds = variants.filter((v) => v.id).map((v) => v.id as string);
-
       await prismadb.$transaction(
         async (tx) => {
-          if (incomingVariantIds.length > 0) {
-            await tx.productVariant.deleteMany({
-              where: {
-                productId: params.productId,
-                id: { notIn: incomingVariantIds },
-              },
-            });
-          } else {
-            await tx.productVariant.deleteMany({
-              where: { productId: params.productId },
-            });
-          }
-
-          for (const v of variants) {
-            if (v.id) {
-              await tx.productVariant.update({
-                where: { id: v.id, productId: params.productId },
-                data: {
-                  colorId: v.colorId,
-                  sizeId: v.sizeId,
-                  stock: v.stock,
-                },
-              });
-            } else {
-              await tx.productVariant.create({
-                data: {
-                  productId: params.productId,
-                  colorId: v.colorId,
-                  sizeId: v.sizeId,
-                  stock: v.stock,
-                },
-              });
-            }
-          }
+          await reconcileProductVariants(tx, params.storeId, params.productId, variants);
 
           await tx.product.update({
             where: { id: params.productId },
@@ -308,6 +277,12 @@ export async function PATCH(
 
     return NextResponse.json(product);
   } catch (error) {
+    if (error instanceof InsufficientVariantStagingError) {
+      return new NextResponse(
+        "Cannot rearrange variants: add more colors or sizes in the store, or reduce how many variant rows you change at once.",
+        { status: 409 }
+      );
+    }
     console.log("[PRODUCT_PATCH]", error);
     return new NextResponse("Internal error", { status: 500 });
   }
