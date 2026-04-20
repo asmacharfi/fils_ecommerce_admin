@@ -1,24 +1,19 @@
-import { UserButton, auth } from "@clerk/nextjs";
-import { redirect } from "next/navigation";
+import { UserButton } from "@clerk/nextjs";
 
 import StoreSwitcher from "@/components/store-switcher";
 import { MainNav } from "@/components/main-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
-import prismadb from "@/lib/prismadb";
 
-const Navbar = async () => {
-  const { userId } = auth();
+type NavbarStore = {
+  id: string;
+  name: string;
+};
 
-  if (!userId) {
-    redirect('/sign-in');
-  }
+interface NavbarProps {
+  stores: NavbarStore[];
+}
 
-  const stores = await prismadb.store.findMany({
-    where: {
-      userId,
-    }
-  });
-
+const Navbar = ({ stores }: NavbarProps) => {
   return ( 
     <div className="border-b">
       <div className="flex h-16 items-center px-4">

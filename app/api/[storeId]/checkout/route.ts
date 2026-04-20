@@ -10,7 +10,41 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-type Line = { productId: string; quantity: number };
+type VariantLine = { kind: "variant"; variantId: string; quantity: number };
+type ProductLine = { kind: "product"; productId: string; quantity: number };
+type Line = VariantLine | ProductLine;
+
+function parseCheckoutLines(rawItems: unknown): Line[] | null {
+  if (!Array.isArray(rawItems) || rawItems.length === 0) return null;
+  const merged = new Map<string, Line>();
+  for (const row of rawItems) {
+    const r = row as Record<string, unknown>;
+    const q = Math.trunc(Number(r.quantity));
+    const variantId = typeof r.variantId === "string" && r.variantId ? r.variantId : "";
+    const productId = typeof r.productId === "string" && r.productId ? r.productId : "";
+    if (!Number.isFinite(q) || q < 1) return null;
+    if (variantId && productId) return null;
+    if (!variantId && !productId) return null;
+    if (variantId) {
+      const key = `v:${variantId}`;
+      const prev = merged.get(key) as VariantLine | undefined;
+      merged.set(key, {
+        kind: "variant",
+        variantId,
+        quantity: (prev?.quantity ?? 0) + q,
+      });
+    } else {
+      const key = `p:${productId}`;
+      const prev = merged.get(key) as ProductLine | undefined;
+      merged.set(key, {
+        kind: "product",
+        productId,
+        quantity: (prev?.quantity ?? 0) + q,
+      });
+    }
+  }
+  return Array.from(merged.values());
+}
 
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
@@ -18,46 +52,72 @@ export async function OPTIONS() {
 
 export async function POST(req: Request, { params }: { params: { storeId: string } }) {
   const body = await req.json();
-  const rawItems = body.items as Line[] | undefined;
-  const legacyIds = body.productIds as string[] | undefined;
+  const rawItems = body.items as unknown;
+  const lines = parseCheckoutLines(rawItems);
 
-  let lines: Line[] = [];
-
-  if (Array.isArray(rawItems) && rawItems.length > 0) {
-    const merged = new Map<string, number>();
-    for (const row of rawItems) {
-      const id = row?.productId;
-      const q = Math.trunc(Number(row?.quantity));
-      if (!id || !Number.isFinite(q) || q < 1) {
-        return new NextResponse("Invalid line item", { status: 400 });
-      }
-      merged.set(id, (merged.get(id) ?? 0) + q);
-    }
-    lines = Array.from(merged.entries()).map(([productId, quantity]) => ({ productId, quantity }));
-  } else if (Array.isArray(legacyIds) && legacyIds.length > 0) {
-    lines = legacyIds.map((productId) => ({ productId, quantity: 1 }));
-  } else {
-    return new NextResponse("items or productIds are required", { status: 400 });
+  if (!lines?.length) {
+    return new NextResponse("items array with variantId or productId and quantity is required", { status: 400 });
   }
 
-  const productIds = lines.map((l) => l.productId);
+  const variantLines = lines.filter((l): l is VariantLine => l.kind === "variant");
+  const productLines = lines.filter((l): l is ProductLine => l.kind === "product");
 
-  const products = await prismadb.product.findMany({
+  const variantIds = variantLines.map((l) => l.variantId);
+  const variants = await prismadb.productVariant.findMany({
     where: {
-      id: { in: productIds },
-      storeId: params.storeId,
-      isArchived: false,
+      id: { in: variantIds },
+      product: {
+        storeId: params.storeId,
+        isArchived: false,
+      },
+    },
+    include: {
+      product: true,
+      color: true,
+      size: true,
     },
   });
 
-  if (products.length !== new Set(productIds).size) {
+  if (variantIds.length && variants.length !== new Set(variantIds).size) {
+    return new NextResponse("Invalid or missing variants for this store", { status: 400 });
+  }
+
+  const byVariantId = new Map(variants.map((v) => [v.id, v]));
+
+  for (const line of variantLines) {
+    const v = byVariantId.get(line.variantId);
+    if (!v || line.quantity > v.stock) {
+      return new NextResponse("Insufficient stock for one or more items", { status: 400 });
+    }
+  }
+
+  const productIds = productLines.map((l) => l.productId);
+  const simpleProducts =
+    productIds.length > 0
+      ? await prismadb.product.findMany({
+          where: {
+            id: { in: productIds },
+            storeId: params.storeId,
+            isArchived: false,
+            variants: { none: {} },
+          },
+          select: {
+            id: true,
+            stock: true,
+            name: true,
+            price: true,
+          },
+        })
+      : [];
+
+  if (productIds.length && simpleProducts.length !== new Set(productIds).size) {
     return new NextResponse("Invalid or missing products for this store", { status: 400 });
   }
 
-  const byId = new Map(products.map((p) => [p.id, p]));
+  const byProductId = new Map(simpleProducts.map((p) => [p.id, p]));
 
-  for (const line of lines) {
-    const p = byId.get(line.productId);
+  for (const line of productLines) {
+    const p = byProductId.get(line.productId);
     if (!p || line.quantity > p.stock) {
       return new NextResponse("Insufficient stock for one or more items", { status: 400 });
     }
@@ -65,12 +125,29 @@ export async function POST(req: Request, { params }: { params: { storeId: string
 
   try {
     const orderId = await prismadb.$transaction(async (tx) => {
-      for (const line of lines) {
+      for (const line of variantLines) {
+        const result = await tx.productVariant.updateMany({
+          where: {
+            id: line.variantId,
+            stock: { gte: line.quantity },
+            product: { storeId: params.storeId },
+          },
+          data: {
+            stock: { decrement: line.quantity },
+          },
+        });
+        if (result.count !== 1) {
+          throw new Error("STOCK_CONFLICT");
+        }
+      }
+
+      for (const line of productLines) {
         const result = await tx.product.updateMany({
           where: {
             id: line.productId,
             storeId: params.storeId,
             stock: { gte: line.quantity },
+            variants: { none: {} },
           },
           data: {
             stock: { decrement: line.quantity },
@@ -86,10 +163,21 @@ export async function POST(req: Request, { params }: { params: { storeId: string
           storeId: params.storeId,
           isPaid: false,
           orderItems: {
-            create: lines.map((line) => ({
-              quantity: line.quantity,
-              product: { connect: { id: line.productId } },
-            })),
+            create: [
+              ...variantLines.map((line) => {
+                const v = byVariantId.get(line.variantId)!;
+                return {
+                  quantity: line.quantity,
+                  productId: v.productId,
+                  variantId: v.id,
+                };
+              }),
+              ...productLines.map((line) => ({
+                quantity: line.quantity,
+                productId: line.productId,
+                variantId: null as string | null,
+              })),
+            ],
           },
         },
       });
@@ -97,19 +185,35 @@ export async function POST(req: Request, { params }: { params: { storeId: string
       return order.id;
     });
 
-    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = lines.map((line) => {
-      const product = byId.get(line.productId)!;
-      return {
-        quantity: line.quantity,
-        price_data: {
-          currency: "USD",
-          product_data: {
-            name: product.name,
+    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      ...variantLines.map((line) => {
+        const v = byVariantId.get(line.variantId)!;
+        const name = `${v.product.name} (${v.color.name} / ${v.size.name})`;
+        return {
+          quantity: line.quantity,
+          price_data: {
+            currency: "USD",
+            product_data: {
+              name,
+            },
+            unit_amount: v.product.price.toNumber() * 100,
           },
-          unit_amount: product.price.toNumber() * 100,
-        },
-      };
-    });
+        };
+      }),
+      ...productLines.map((line) => {
+        const p = byProductId.get(line.productId)!;
+        return {
+          quantity: line.quantity,
+          price_data: {
+            currency: "USD",
+            product_data: {
+              name: p.name,
+            },
+            unit_amount: p.price.toNumber() * 100,
+          },
+        };
+      }),
+    ];
 
     const session = await stripe.checkout.sessions.create({
       line_items,

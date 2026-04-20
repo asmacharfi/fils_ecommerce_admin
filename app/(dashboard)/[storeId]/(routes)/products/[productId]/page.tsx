@@ -7,32 +7,37 @@ const ProductPage = async ({
 }: {
   params: { productId: string, storeId: string }
 }) => {
-  const product = await prismadb.product.findUnique({
-    where: {
-      id: params.productId,
-    },
-    include: {
-      images: true,
-    }
-  });
-
-  const categories = await prismadb.category.findMany({
-    where: {
-      storeId: params.storeId,
-    },
-  });
-
-  const sizes = await prismadb.size.findMany({
-    where: {
-      storeId: params.storeId,
-    },
-  });
-
-  const colors = await prismadb.color.findMany({
-    where: {
-      storeId: params.storeId,
-    },
-  });
+  const [product, categories, sizes, colors] = await Promise.all([
+    prismadb.product.findUnique({
+      where: {
+        id: params.productId,
+      },
+      include: {
+        images: true,
+        variants: {
+          include: {
+            color: true,
+            size: true,
+          },
+        },
+      },
+    }),
+    prismadb.category.findMany({
+      where: {
+        storeId: params.storeId,
+      },
+    }),
+    prismadb.size.findMany({
+      where: {
+        storeId: params.storeId,
+      },
+    }),
+    prismadb.color.findMany({
+      where: {
+        storeId: params.storeId,
+      },
+    }),
+  ]);
 
   return ( 
     <div className="flex-col">

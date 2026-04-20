@@ -21,8 +21,8 @@ export type AdminProductSummary = {
   name: string;
   price: string;
   categoryName: string;
-  colorName: string;
-  sizeName: string;
+  variantCount: number;
+  totalStock: number;
   isFeatured: boolean;
   isArchived: boolean;
 };
@@ -66,8 +66,7 @@ export function createAdminSearchProductsTool(storeId: string) {
         orderBy: { updatedAt: "desc" },
         include: {
           category: true,
-          color: true,
-          size: true,
+          variants: true,
         },
       });
 
@@ -84,8 +83,9 @@ export function createAdminSearchProductsTool(storeId: string) {
         name: p.name,
         price: p.price.toString(),
         categoryName: p.category.name,
-        colorName: p.color.name,
-        sizeName: p.size.name,
+        variantCount: p.variants.length,
+        totalStock:
+          p.variants.length > 0 ? p.variants.reduce((s, v) => s + v.stock, 0) : p.stock,
         isFeatured: p.isFeatured,
         isArchived: p.isArchived,
       }));

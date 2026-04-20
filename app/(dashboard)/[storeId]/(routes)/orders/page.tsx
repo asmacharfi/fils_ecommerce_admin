@@ -16,10 +16,21 @@ const OrdersPage = async ({
     where: {
       storeId: params.storeId
     },
-    include: {
+    select: {
+      id: true,
+      phone: true,
+      address: true,
+      isPaid: true,
+      createdAt: true,
       orderItems: {
-        include: {
-          product: true
+        select: {
+          quantity: true,
+          product: {
+            select: {
+              name: true,
+              price: true,
+            },
+          },
         }
       }
     },

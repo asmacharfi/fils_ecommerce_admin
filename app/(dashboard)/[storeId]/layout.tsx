@@ -18,12 +18,20 @@ export default async function DashboardLayout({
     redirect('/sign-in');
   }
 
-  const store = await prismadb.store.findFirst({ 
+  const stores = await prismadb.store.findMany({
     where: {
-      id: params.storeId,
       userId,
-    }
-   });
+    },
+    select: {
+      id: true,
+      name: true,
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
+
+  const store = stores.find((item) => item.id === params.storeId);
 
   if (!store) {
     redirect('/');
@@ -31,7 +39,7 @@ export default async function DashboardLayout({
 
   return (
     <>
-      <Navbar />
+      <Navbar stores={stores} />
       <AdminAIDrawer storeId={params.storeId} />
       {children}
     </>

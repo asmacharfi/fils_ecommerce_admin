@@ -1,12 +1,50 @@
-import { PrismaClient } from "@prisma/client"
+import { PrismaClient } from "@prisma/client";
 
-declare global {
-  var prisma: PrismaClient | undefined
+/**
+ * Cap Prisma's pool size so small hosted Postgres plans (e.g. Aiven free/hobby)
+ * do not hit "remaining connection slots are reserved for ... SUPERUSER" (P2037).
+ * Honors an explicit `connection_limit` on DATABASE_URL when present.
+ */
+function prismaDatabaseUrl(): string | undefined {
+  const raw = process.env.DATABASE_URL;
+  if (!raw) return undefined;
+  try {
+    const u = new URL(raw);
+    if (!u.searchParams.has("connection_limit")) {
+      const limit =
+        process.env.DATABASE_CONNECTION_LIMIT ??
+        (process.env.NODE_ENV === "development" ? "1" : "3");
+      u.searchParams.set("connection_limit", limit);
+    }
+    if (!u.searchParams.has("pool_timeout")) {
+      u.searchParams.set("pool_timeout", "20");
+    }
+    return u.toString();
+  } catch {
+    return raw;
+  }
 }
 
-const prismadb = globalThis.prisma || new PrismaClient()
-if (process.env.NODE_ENV !== "production") globalThis.prisma = prismadb
+const globalForPrisma = globalThis as unknown as {
+  prismadb: PrismaClient | undefined;
+};
+
+function createClient() {
+  const url = prismaDatabaseUrl();
+  return new PrismaClient({
+    ...(url
+      ? {
+          datasources: {
+            db: { url },
+          },
+        }
+      : {}),
+    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+  });
+}
+
+const prismadb =
+  globalForPrisma.prismadb ??
+  (globalForPrisma.prismadb = createClient());
 
 export default prismadb;
-
-

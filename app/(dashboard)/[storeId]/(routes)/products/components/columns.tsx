@@ -11,7 +11,9 @@ export type ProductColumn = {
   stock: number;
   category: string;
   size: string;
+  /** Hex swatch */
   color: string;
+  colorName: string;
   createdAt: string;
   isFeatured: boolean;
   isArchived: boolean;
@@ -51,7 +53,7 @@ export const columns: ColumnDef<ProductColumn>[] = [
     header: "Color",
     cell: ({ row }) => (
       <div className="flex items-center gap-x-2">
-        {row.original.color}
+        <span className="text-xs text-muted-foreground">{row.original.colorName}</span>
         <div className="h-6 w-6 rounded-full border" style={{ backgroundColor: row.original.color }} />
       </div>
     )

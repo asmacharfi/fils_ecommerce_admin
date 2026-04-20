@@ -7,36 +7,70 @@ import { ProductsClient } from "./components/client";
 import { ProductColumn } from "./components/columns";
 
 const ProductsPage = async ({
-  params
+  params,
 }: {
-  params: { storeId: string }
+  params: { storeId: string };
 }) => {
   const products = await prismadb.product.findMany({
     where: {
-      storeId: params.storeId
+      storeId: params.storeId,
     },
-    include: {
-      category: true,
-      size: true,
-      color: true,
+    select: {
+      id: true,
+      name: true,
+      isFeatured: true,
+      isArchived: true,
+      price: true,
+      createdAt: true,
+      category: {
+        select: {
+          name: true,
+        },
+      },
+      variants: {
+        select: {
+          stock: true,
+          color: {
+            select: {
+              name: true,
+              value: true,
+            },
+          },
+          size: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
     },
     orderBy: {
-      createdAt: 'desc'
-    }
+      createdAt: "desc",
+    },
   });
 
-  const formattedProducts: ProductColumn[] = products.map((item) => ({
-    id: item.id,
-    name: item.name,
-    isFeatured: item.isFeatured,
-    isArchived: item.isArchived,
-    price: formatter.format(item.price.toNumber()),
-    stock: item.stock,
-    category: item.category.name,
-    size: item.size.name,
-    color: item.color.value,
-    createdAt: format(item.createdAt, 'MMMM do, yyyy'),
-  }));
+  const formattedProducts: ProductColumn[] = products.map((item) => {
+    const stock = item.variants.reduce((sum, v) => sum + v.stock, 0);
+    const first = item.variants[0];
+    const sizeLabel =
+      item.variants.length <= 1 ? (first?.size.name ?? "—") : `${new Set(item.variants.map((v) => v.size.name)).size} sizes`;
+    const colorSwatch = first?.color.value ?? "#ccc";
+    const colorName = first?.color.name ?? "—";
+
+    return {
+      id: item.id,
+      name: item.name,
+      isFeatured: item.isFeatured,
+      isArchived: item.isArchived,
+      price: formatter.format(item.price.toNumber()),
+      stock,
+      category: item.category.name,
+      size: sizeLabel,
+      color: colorSwatch,
+      colorName,
+      createdAt: format(item.createdAt, "MMMM do, yyyy"),
+    };
+  });
 
   return (
     <div className="flex-col">
