@@ -48,13 +48,22 @@ function neonDirectToPoolerUrl(raw: string): string {
 }
 
 /**
- * Cap Prisma's pool size so small hosted Postgres plans (e.g. Aiven free/hobby)
- * do not hit "remaining connection slots are reserved for ... SUPERUSER" (P2037).
- * Honors an explicit `connection_limit` on the URL when present.
+ * Aiven PgBouncer pool URIs reuse the same hostname as the primary service but use a
+ * different port; the path’s database segment is the *pool name* (not `defaultdb`).
+ * Prisma needs `pgbouncer=true` for transaction-mode PgBouncer.
+ * @see https://aiven.io/docs/products/postgresql/howto/manage-pool
  */
+function aivenUsesConnectionPoolPath(u: URL): boolean {
+  const h = u.hostname.toLowerCase();
+  if (!h.endsWith(".aivencloud.com")) return false;
+  const pathDb = (u.pathname.replace(/^\//, "").split("/")[0] ?? "").trim();
+  if (!pathDb) return false;
+  return pathDb.toLowerCase() !== "defaultdb";
+}
+
 /**
- * PgBouncer / Neon pooler in transaction mode needs `pgbouncer=true` so Prisma does not
- * exhaust server-side prepared statements or open extra logical connections.
+ * PgBouncer (transaction mode) needs `pgbouncer=true` so Prisma disables prepared
+ * statements that PgBouncer cannot pin to one server session.
  */
 function ensurePgbouncerParamForPoolerHosts(u: URL): void {
   const h = u.hostname.toLowerCase();
@@ -62,12 +71,17 @@ function ensurePgbouncerParamForPoolerHosts(u: URL): void {
     h.includes("pooler") ||
     /\.pooler\.supabase\.com$/i.test(h) ||
     (/\.aws\.neon\.tech$/i.test(h) && h.split(".")[0]?.endsWith("-pooler"));
-  if (!pooledHost) return;
+  if (!pooledHost && !aivenUsesConnectionPoolPath(u)) return;
   if (!u.searchParams.has("pgbouncer")) {
     u.searchParams.set("pgbouncer", "true");
   }
 }
 
+/**
+ * Cap Prisma pool size so small hosted Postgres plans do not hit P2037
+ * ("remaining connection slots are reserved for … SUPERUSER").
+ * Honors an explicit `connection_limit` on the URL when present.
+ */
 function prismaDatabaseUrl(): string | undefined {
   let raw = pickRawDatabaseUrl();
   if (!raw) return undefined;
@@ -76,6 +90,9 @@ function prismaDatabaseUrl(): string | undefined {
     const u = new URL(raw);
     if (/\.aws\.neon\.tech$/i.test(u.hostname) && !u.searchParams.has("connect_timeout")) {
       u.searchParams.set("connect_timeout", "15");
+    }
+    if (u.hostname.toLowerCase().endsWith(".aivencloud.com") && !u.searchParams.has("sslmode")) {
+      u.searchParams.set("sslmode", "require");
     }
     ensurePgbouncerParamForPoolerHosts(u);
     if (!u.searchParams.has("connection_limit")) {
