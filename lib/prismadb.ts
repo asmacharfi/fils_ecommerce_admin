@@ -1,12 +1,37 @@
 import { PrismaClient } from "@prisma/client";
 
+function stripEnvQuotes(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  let s = value.trim();
+  if (
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    s = s.slice(1, -1).trim();
+  }
+  return s || undefined;
+}
+
+/**
+ * Runtime URL for the Prisma client (serverless-friendly).
+ * Prefer pooled URLs when present (Vercel Postgres, Neon, etc.) so many
+ * concurrent lambdas do not exhaust direct Postgres connection slots (P2037).
+ */
+function pickRawDatabaseUrl(): string | undefined {
+  return (
+    stripEnvQuotes(process.env.POSTGRES_PRISMA_URL) ||
+    stripEnvQuotes(process.env.PRISMA_DATABASE_URL) ||
+    stripEnvQuotes(process.env.DATABASE_URL)
+  );
+}
+
 /**
  * Cap Prisma's pool size so small hosted Postgres plans (e.g. Aiven free/hobby)
  * do not hit "remaining connection slots are reserved for ... SUPERUSER" (P2037).
- * Honors an explicit `connection_limit` on DATABASE_URL when present.
+ * Honors an explicit `connection_limit` on the URL when present.
  */
 function prismaDatabaseUrl(): string | undefined {
-  const raw = process.env.DATABASE_URL;
+  const raw = pickRawDatabaseUrl();
   if (!raw) return undefined;
   try {
     const u = new URL(raw);
