@@ -52,6 +52,22 @@ function neonDirectToPoolerUrl(raw: string): string {
  * do not hit "remaining connection slots are reserved for ... SUPERUSER" (P2037).
  * Honors an explicit `connection_limit` on the URL when present.
  */
+/**
+ * PgBouncer / Neon pooler in transaction mode needs `pgbouncer=true` so Prisma does not
+ * exhaust server-side prepared statements or open extra logical connections.
+ */
+function ensurePgbouncerParamForPoolerHosts(u: URL): void {
+  const h = u.hostname.toLowerCase();
+  const pooledHost =
+    h.includes("pooler") ||
+    /\.pooler\.supabase\.com$/i.test(h) ||
+    (/\.aws\.neon\.tech$/i.test(h) && h.split(".")[0]?.endsWith("-pooler"));
+  if (!pooledHost) return;
+  if (!u.searchParams.has("pgbouncer")) {
+    u.searchParams.set("pgbouncer", "true");
+  }
+}
+
 function prismaDatabaseUrl(): string | undefined {
   let raw = pickRawDatabaseUrl();
   if (!raw) return undefined;
@@ -61,6 +77,7 @@ function prismaDatabaseUrl(): string | undefined {
     if (/\.aws\.neon\.tech$/i.test(u.hostname) && !u.searchParams.has("connect_timeout")) {
       u.searchParams.set("connect_timeout", "15");
     }
+    ensurePgbouncerParamForPoolerHosts(u);
     if (!u.searchParams.has("connection_limit")) {
       const limit = process.env.DATABASE_CONNECTION_LIMIT ?? "1";
       u.searchParams.set("connection_limit", limit);
