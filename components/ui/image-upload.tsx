@@ -14,9 +14,21 @@ interface ImageUploadProps {
   value: string[];
 }
 
-const optimizeImage = (url: string) => {
-  return url.replace("/upload/", "/upload/f_auto,q_auto,w_1920/");
-};
+/**
+ * Thumbnails are 200×200; request ~2× (400px) with auto format/quality.
+ * c_fill + g_auto matches object-cover. Idempotent: do not stack transforms.
+ */
+const ADMIN_THUMB = "f_auto,q_auto,w_400,h_400,c_fill,g_auto";
+
+function optimizeImage(url: string): string {
+  if (!url || !url.includes("/upload/")) {
+    return url;
+  }
+  if (url.includes("w_400,h_400,c_fill,g_auto")) {
+    return url;
+  }
+  return url.replace("/upload/", `/upload/${ADMIN_THUMB}/`);
+}
 
 const ImageUpload: React.FC<ImageUploadProps> = ({
   disabled,
