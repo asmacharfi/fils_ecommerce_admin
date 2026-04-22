@@ -10,14 +10,26 @@ const DEFAULT_MODEL: Record<AiProviderKind, string> = {
 };
 
 export function resolveAiProvider(): AiProviderKind {
-  const raw = (process.env.AI_PROVIDER || "openai").toLowerCase().trim();
-  return raw === "openrouter" ? "openrouter" : "openai";
+  const raw = (process.env.AI_PROVIDER ?? "").toLowerCase().trim();
+  if (raw === "openrouter") return "openrouter";
+  if (raw === "openai") return "openai";
+
+  const hasOpenRouterKey = Boolean(process.env.OPENROUTER_API_KEY?.trim());
+  const hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY?.trim());
+
+  if (hasOpenRouterKey && !hasOpenAiKey) return "openrouter";
+  if (hasOpenAiKey && !hasOpenRouterKey) return "openai";
+  if (hasOpenRouterKey && hasOpenAiKey) return "openrouter";
+
+  return "openai";
 }
 
 /**
  * Returns a configured chat model for either OpenAI or OpenRouter.
- * - Default: OpenAI (`OPENAI_API_KEY`, optional `AI_MODEL`, default `gpt-4o-mini`).
- * - `AI_PROVIDER=openrouter`: `OPENROUTER_API_KEY`, OpenRouter base URL, and optional `OPENROUTER_HTTP_REFERER` / `OPENROUTER_APP_TITLE` headers.
+ * - `AI_PROVIDER=openai|openrouter` forces the provider.
+ * - If `AI_PROVIDER` is omitted: only OpenRouter key → OpenRouter; only OpenAI key → OpenAI; both → OpenRouter.
+ * - OpenRouter: `OPENROUTER_API_KEY`, optional `OPENROUTER_HTTP_REFERER` / `OPENROUTER_APP_TITLE`.
+ * - OpenAI: `OPENAI_API_KEY`, optional `AI_MODEL` (default `gpt-4o-mini` or `openai/gpt-4o-mini` on OpenRouter).
  */
 export function createChatLanguageModel() {
   const provider = resolveAiProvider();
@@ -62,7 +74,9 @@ export function getChatModelEnvError(): string | null {
   if (provider === "openrouter") {
     return process.env.OPENROUTER_API_KEY?.trim()
       ? null
-      : "OPENROUTER_API_KEY is not configured (AI_PROVIDER=openrouter).";
+      : "OPENROUTER_API_KEY is not configured. Add it (and optionally AI_PROVIDER=openrouter).";
   }
-  return process.env.OPENAI_API_KEY?.trim() ? null : "OPENAI_API_KEY is not configured.";
+  return process.env.OPENAI_API_KEY?.trim()
+    ? null
+    : "OPENAI_API_KEY is not configured. Add it, or set OPENROUTER_API_KEY (OpenRouter is used automatically when it is the only key, or when both keys are set and AI_PROVIDER is omitted).";
 }
