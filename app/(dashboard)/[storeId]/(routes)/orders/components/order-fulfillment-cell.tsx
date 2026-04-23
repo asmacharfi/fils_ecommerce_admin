@@ -1,7 +1,7 @@
 "use client";
 
 import axios from "axios";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import toast from "react-hot-toast";
 
@@ -23,6 +23,7 @@ type Props = {
 
 export function OrderFulfillmentCell({ row }: Props) {
   const params = useParams();
+  const router = useRouter();
   const storeId = params.storeId as string;
   const [status, setStatus] = useState(row.fulfillmentStatus);
   const [tracking, setTracking] = useState(row.trackingNumber);
@@ -42,8 +43,17 @@ export function OrderFulfillmentCell({ row }: Props) {
       if (nextStatus) setStatus(nextStatus);
       if (nextTracking !== undefined) setTracking(nextTracking);
       toast.success("Order updated");
-    } catch {
-      toast.error("Could not update order");
+      router.refresh();
+    } catch (e) {
+      if (axios.isAxiosError(e) && e.response) {
+        const { status, data } = e.response;
+        const body = typeof data === "string" ? data : "Could not update order";
+        if (status === 401) toast.error("Session expired. Sign in again.");
+        else if (status === 403) toast.error("Access denied.");
+        else toast.error(body);
+      } else {
+        toast.error("Could not update order");
+      }
     } finally {
       setSaving(false);
     }
