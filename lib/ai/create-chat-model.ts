@@ -6,7 +6,8 @@ const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 const DEFAULT_MODEL: Record<AiProviderKind, string> = {
   openai: "gpt-4o-mini",
-  openrouter: "openai/gpt-4o-mini",
+  /** OpenRouter free tier; avoids paid default when AI_MODEL is unset. */
+  openrouter: "openai/gpt-oss-120b:free",
 };
 
 export function resolveAiProvider(): AiProviderKind {
@@ -29,7 +30,7 @@ export function resolveAiProvider(): AiProviderKind {
  * - `AI_PROVIDER=openai|openrouter` forces the provider.
  * - If `AI_PROVIDER` is omitted: only OpenRouter key → OpenRouter; only OpenAI key → OpenAI; both → OpenRouter.
  * - OpenRouter: `OPENROUTER_API_KEY`, optional `OPENROUTER_HTTP_REFERER` / `OPENROUTER_APP_TITLE`.
- * - OpenAI: `OPENAI_API_KEY`, optional `AI_MODEL` (default `gpt-4o-mini` or `openai/gpt-4o-mini` on OpenRouter).
+ * - OpenAI: `OPENAI_API_KEY`, optional `AI_MODEL` (default `gpt-4o-mini` on OpenAI, `openai/gpt-oss-120b:free` on OpenRouter when unset).
  */
 export function createChatLanguageModel() {
   const provider = resolveAiProvider();
