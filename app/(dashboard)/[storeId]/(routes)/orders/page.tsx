@@ -21,6 +21,8 @@ const OrdersPage = async ({
       phone: true,
       address: true,
       isPaid: true,
+      fulfillmentStatus: true,
+      trackingNumber: true,
       createdAt: true,
       orderItems: {
         select: {
@@ -56,6 +58,15 @@ const OrdersPage = async ({
       }, 0)
     ),
     isPaid: item.isPaid,
+    fulfillmentStatus: item.fulfillmentStatus,
+    trackingNumber: item.trackingNumber,
+    statusLabel: item.isPaid
+      ? item.fulfillmentStatus === "SHIPPED"
+        ? "Shipped"
+        : item.fulfillmentStatus === "DELIVERED"
+          ? "Delivered"
+          : "Processing"
+      : "Awaiting payment",
     createdAt: format(item.createdAt, 'MMMM do, yyyy'),
   }));
 

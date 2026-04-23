@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { stripe } from "@/lib/stripe";
 import prismadb from "@/lib/prismadb";
+import { parseOptionalUuid, verifyStorefrontBearer } from "@/lib/verify-storefront-bearer";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,6 +55,21 @@ export async function POST(req: Request, { params }: { params: { storeId: string
   try {
     const body = await req.json();
     const rawItems = body.items as unknown;
+    const shopperId = parseOptionalUuid(body.shopperId);
+    const bodyClerkRaw = typeof body.clerkUserId === "string" ? body.clerkUserId.trim() : "";
+
+    let clerkUserId: string | null = null;
+    if (bodyClerkRaw) {
+      const verified = await verifyStorefrontBearer(req);
+      if (!verified || verified !== bodyClerkRaw) {
+        return new NextResponse("Signed-in checkout requires a valid Clerk session token.", {
+          status: 403,
+          headers: corsHeaders,
+        });
+      }
+      clerkUserId = verified;
+    }
+
     const lines = parseCheckoutLines(rawItems);
 
     if (!lines?.length) {
@@ -177,6 +193,8 @@ export async function POST(req: Request, { params }: { params: { storeId: string
         data: {
           storeId: params.storeId,
           isPaid: false,
+          shopperId,
+          clerkUserId,
           orderItems: {
             create: [
               ...variantLines.map((line) => {
@@ -241,6 +259,8 @@ export async function POST(req: Request, { params }: { params: { storeId: string
       cancel_url: `${process.env.FRONTEND_STORE_URL}/cart?canceled=1`,
       metadata: {
         orderId,
+        ...(shopperId ? { shopperId } : {}),
+        ...(clerkUserId ? { clerkUserId } : {}),
       },
     });
 

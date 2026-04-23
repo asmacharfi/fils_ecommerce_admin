@@ -63,6 +63,8 @@ export async function POST(req: Request, { params }: { params: { storeId: string
     ];
     const addressString = addressComponents.filter((c) => c != null && c !== "").join(", ");
 
+    const email = session.customer_details?.email ?? "";
+
     await prismadb.$transaction(async (tx) => {
       await tx.order.update({
         where: { id: orderId },
@@ -70,6 +72,8 @@ export async function POST(req: Request, { params }: { params: { storeId: string
           isPaid: true,
           address: addressString,
           phone: session.customer_details?.phone ?? "",
+          customerEmail: email,
+          fulfillmentStatus: "PROCESSING",
         },
       });
 

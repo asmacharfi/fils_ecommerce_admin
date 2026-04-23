@@ -37,6 +37,8 @@ export async function POST(req: Request) {
 
 
   if (event.type === "checkout.session.completed") {
+    const email = session?.customer_details?.email || "";
+
     const order = await prismadb.order.update({
       where: {
         id: session?.metadata?.orderId,
@@ -45,6 +47,8 @@ export async function POST(req: Request) {
         isPaid: true,
         address: addressString,
         phone: session?.customer_details?.phone || '',
+        customerEmail: email,
+        fulfillmentStatus: "PROCESSING",
       },
       include: {
         orderItems: true,

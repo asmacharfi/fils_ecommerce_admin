@@ -101,18 +101,34 @@ model ProductVariant {
   @@index([sizeId])
 }
 
+enum OrderFulfillmentStatus {
+  PROCESSING
+  SHIPPED
+  DELIVERED
+}
+
 model Order {
   id         String      @id @default(uuid())
   storeId    String
   store      Store       @relation("StoreToOrder", fields: [storeId], references: [id])
   orderItems OrderItem[]
   isPaid     Boolean     @default(false)
+  /// Set when payment succeeds (webhook). Merchant advances to SHIPPED then DELIVERED.
+  fulfillmentStatus OrderFulfillmentStatus @default(PROCESSING)
+  /// Anonymous storefront visitor id (UUID) for recommendations before/without login.
+  shopperId   String?
+  /// Clerk user id when the buyer checked out signed-in (verified at checkout).
+  clerkUserId String?
+  customerEmail String  @default("")
   phone      String      @default("")
   address    String      @default("")
+  trackingNumber String @default("")
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
   @@index([storeId])
+  @@index([storeId, shopperId])
+  @@index([storeId, clerkUserId])
 }
 
 model OrderItem {
