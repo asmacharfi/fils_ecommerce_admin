@@ -19,7 +19,19 @@ export async function verifyStorefrontBearer(req: Request): Promise<string | nul
   }
 
   try {
-    const payload = await verifyToken(token, { secretKey });
+    const partiesRaw = process.env.CLERK_AUTHORIZED_PARTIES?.trim();
+    const authorizedParties = partiesRaw
+      ? partiesRaw
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : undefined;
+
+    const payload = await verifyToken(token, {
+      secretKey,
+      clockSkewInMs: 120_000,
+      ...(authorizedParties?.length ? { authorizedParties } : {}),
+    });
     const sub = typeof payload.sub === "string" ? payload.sub : null;
     return sub || null;
   } catch {
