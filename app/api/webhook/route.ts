@@ -2,7 +2,6 @@ import Stripe from "stripe"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
 
-import { archiveProductsIfFullyOutOfStock } from "@/lib/archive-products-if-fully-out-of-stock"
 import { stripe } from "@/lib/stripe"
 import prismadb from "@/lib/prismadb"
 
@@ -41,7 +40,7 @@ export async function POST(req: Request) {
     const email = session?.customer_details?.email || "";
 
     await prismadb.$transaction(async (tx) => {
-      const order = await tx.order.update({
+      await tx.order.update({
         where: {
           id: session?.metadata?.orderId,
         },
@@ -52,13 +51,7 @@ export async function POST(req: Request) {
           customerEmail: email,
           fulfillmentStatus: "PROCESSING",
         },
-        include: {
-          orderItems: true,
-        }
       });
-
-      const productIds = order.orderItems.map((orderItem) => orderItem.productId);
-      await archiveProductsIfFullyOutOfStock(tx, productIds);
     });
   }
 

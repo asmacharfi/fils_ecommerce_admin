@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { archiveProductsIfFullyOutOfStock } from "@/lib/archive-products-if-fully-out-of-stock";
 import { stripe } from "@/lib/stripe";
 import prismadb from "@/lib/prismadb";
 
@@ -78,10 +77,6 @@ export async function POST(req: Request, { params }: { params: { storeId: string
         },
       });
 
-      const productIds = order.orderItems.map((oi) => oi.productId);
-      if (productIds.length) {
-        await archiveProductsIfFullyOutOfStock(tx, productIds);
-      }
     });
 
     return NextResponse.json({ ok: true }, { headers: corsHeaders });
