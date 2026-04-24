@@ -218,6 +218,15 @@ export async function POST(req: Request, { params }: { params: { storeId: string
       return order.id;
     });
 
+    const storeFront = process.env.FRONTEND_STORE_URL?.trim().replace(/\/$/, "");
+    if (!storeFront) {
+      console.error("[CHECKOUT_POST] FRONTEND_STORE_URL is not set");
+      return new NextResponse("Checkout misconfigured: set FRONTEND_STORE_URL on the admin deployment.", {
+        status: 500,
+        headers: corsHeaders,
+      });
+    }
+
     const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = [
       ...variantLines.map((line) => {
         const v = byVariantId.get(line.variantId)!;
@@ -255,8 +264,8 @@ export async function POST(req: Request, { params }: { params: { storeId: string
       phone_number_collection: {
         enabled: true,
       },
-      success_url: `${process.env.FRONTEND_STORE_URL}/cart?success=1&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_STORE_URL}/cart?canceled=1`,
+      success_url: `${storeFront}/cart?success=1&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${storeFront}/cart?canceled=1`,
       metadata: {
         orderId,
         ...(shopperId ? { shopperId } : {}),
