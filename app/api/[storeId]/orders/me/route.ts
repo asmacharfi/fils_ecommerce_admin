@@ -43,6 +43,11 @@ export async function GET(req: Request, { params }: { params: { storeId: string 
                 id: true,
                 name: true,
                 price: true,
+                images: {
+                  take: 1,
+                  orderBy: { createdAt: "asc" },
+                  select: { url: true },
+                },
               },
             },
           },
@@ -71,6 +76,7 @@ export async function GET(req: Request, { params }: { params: { storeId: string 
           productId: oi.product.id,
           name: oi.product.name,
           unitPrice: Number(oi.product.price),
+          imageUrl: oi.product.images[0]?.url ?? null,
         })),
       };
     });
